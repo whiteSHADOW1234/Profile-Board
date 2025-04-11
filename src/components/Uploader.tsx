@@ -25,20 +25,27 @@ const Uploader = ({ onSvgUpload }: UploaderProps) => {
   const processSvgFile = async (file: File) => {
     try {
       setIsLoading(true);
+      
+      // Create an object URL first
+      const url = URL.createObjectURL(file);
+      
+      // Read file content
       const content = await file.text();
       
       if (!isValidSvg(content)) {
+        URL.revokeObjectURL(url);
         alert('Invalid SVG file.');
         return;
       }
       
-      const url = URL.createObjectURL(file);
-      
-      onSvgUpload({
+      // Create a new SVG object
+      const newSvg: UploadedSvg = {
         id: uuidv4(),
         url,
         content
-      });
+      };
+      
+      onSvgUpload(newSvg);
     } catch (err) {
       console.error('Error processing SVG file:', err);
       alert('Error processing SVG file.');
@@ -80,11 +87,22 @@ const Uploader = ({ onSvgUpload }: UploaderProps) => {
 
     try {
       setIsLoading(true);
-      const response = await fetch(urlInput);
+      
+      // First check if URL is reachable
+      const response = await fetch(urlInput, { method: 'GET' });
+      
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
       }
       
+      const contentType = response.headers.get('content-type');
+      
+      // Check content type if available
+      if (contentType && !contentType.includes('image/svg+xml') && !contentType.includes('text/xml') && !contentType.includes('application/xml')) {
+        console.warn('Warning: Resource might not be an SVG based on Content-Type:', contentType);
+      }
+      
+      // Get content
       const content = await response.text();
       
       if (!isValidSvg(content)) {
@@ -92,12 +110,14 @@ const Uploader = ({ onSvgUpload }: UploaderProps) => {
         return;
       }
       
-      onSvgUpload({
+      // Create new SVG object
+      const newSvg: UploadedSvg = {
         id: uuidv4(),
         url: urlInput,
         content
-      });
+      };
       
+      onSvgUpload(newSvg);
       setUrlInput('');
     } catch (err) {
       console.error('Error fetching SVG from URL:', err);
@@ -138,7 +158,7 @@ const Uploader = ({ onSvgUpload }: UploaderProps) => {
             type="text"
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
-            placeholder="https://.../.svg"
+            placeholder="https://example.com/file.svg"
             className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-l text-sm"
             disabled={isLoading}
           />

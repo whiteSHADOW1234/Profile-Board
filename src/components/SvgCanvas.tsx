@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, createRef, useEffect } from 'react';
 import Draggable from 'react-draggable';
 import { SvgItem, UploadedSvg } from '../types';
 import { v4 as uuidv4 } from 'uuid';
@@ -10,6 +10,26 @@ interface SvgCanvasProps {
 
 const SvgCanvas = ({ items, onUpdateItem }: SvgCanvasProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
+  // Create a ref map for the draggable items
+  const nodeRefs = useRef(new Map());
+
+  // Update refs when items change
+  useEffect(() => {
+    // Clean up old refs that are no longer needed
+    const currentIds = new Set(items.map(item => item.id));
+    [...nodeRefs.current.keys()].forEach(id => {
+      if (!currentIds.has(id as string)) {
+        nodeRefs.current.delete(id);
+      }
+    });
+    
+    // Ensure every item has a ref
+    items.forEach(item => {
+      if (!nodeRefs.current.has(item.id)) {
+        nodeRefs.current.set(item.id, createRef());
+      }
+    });
+  }, [items]);
 
   const handleDrag = (e: any, data: any, item: SvgItem) => {
     onUpdateItem({
@@ -137,63 +157,72 @@ const SvgCanvas = ({ items, onUpdateItem }: SvgCanvasProps) => {
         viewBox="0 0 800 600"
         preserveAspectRatio="xMidYMid meet"
       >
-        {items.map((item) => (
-          <Draggable
-            key={item.id}
-            position={{ x: item.x, y: item.y }}
-            onDrag={(e, data) => handleDrag(e, data, item)}
-            bounds="parent"
-          >
-            <g className="draggable-svg">
-              {item.content ? (
-                <g 
-                  dangerouslySetInnerHTML={{ __html: item.content }} 
-                  transform={`scale(${item.width / 100}, ${item.height / 100})`}
+        {items.map((item) => {
+          // Get or create a ref for this item
+          if (!nodeRefs.current.has(item.id)) {
+            nodeRefs.current.set(item.id, createRef());
+          }
+          const nodeRef = nodeRefs.current.get(item.id);
+          
+          return (
+            <Draggable
+              key={item.id}
+              nodeRef={nodeRef}
+              position={{ x: item.x, y: item.y }}
+              onDrag={(e, data) => handleDrag(e, data, item)}
+              bounds="parent"
+            >
+              <g ref={nodeRef} className="draggable-svg">
+                {item.content ? (
+                  <g 
+                    dangerouslySetInnerHTML={{ __html: item.content }} 
+                    transform={`scale(${item.width / 100}, ${item.height / 100})`}
+                  />
+                ) : (
+                  <image
+                    href={item.url}
+                    width={item.width}
+                    height={item.height}
+                  />
+                )}
+                
+                {/* Resize handles */}
+                <circle 
+                  cx={item.width} 
+                  cy={item.height} 
+                  r={5} 
+                  fill="#007bff" 
+                  onMouseDown={(e) => handleResize(e, item, 'se')}
+                  className="cursor-se-resize"
                 />
-              ) : (
-                <image
-                  href={item.url}
-                  width={item.width}
-                  height={item.height}
+                <circle 
+                  cx={0} 
+                  cy={item.height} 
+                  r={5} 
+                  fill="#007bff" 
+                  onMouseDown={(e) => handleResize(e, item, 'sw')}
+                  className="cursor-sw-resize"
                 />
-              )}
-              
-              {/* Resize handles */}
-              <circle 
-                cx={item.width} 
-                cy={item.height} 
-                r={5} 
-                fill="#007bff" 
-                onMouseDown={(e) => handleResize(e, item, 'se')}
-                className="cursor-se-resize"
-              />
-              <circle 
-                cx={0} 
-                cy={item.height} 
-                r={5} 
-                fill="#007bff" 
-                onMouseDown={(e) => handleResize(e, item, 'sw')}
-                className="cursor-sw-resize"
-              />
-              <circle 
-                cx={item.width} 
-                cy={0} 
-                r={5} 
-                fill="#007bff" 
-                onMouseDown={(e) => handleResize(e, item, 'ne')}
-                className="cursor-ne-resize"
-              />
-              <circle 
-                cx={0} 
-                cy={0} 
-                r={5} 
-                fill="#007bff" 
-                onMouseDown={(e) => handleResize(e, item, 'nw')}
-                className="cursor-nw-resize"
-              />
-            </g>
-          </Draggable>
-        ))}
+                <circle 
+                  cx={item.width} 
+                  cy={0} 
+                  r={5} 
+                  fill="#007bff" 
+                  onMouseDown={(e) => handleResize(e, item, 'ne')}
+                  className="cursor-ne-resize"
+                />
+                <circle 
+                  cx={0} 
+                  cy={0} 
+                  r={5} 
+                  fill="#007bff" 
+                  onMouseDown={(e) => handleResize(e, item, 'nw')}
+                  className="cursor-nw-resize"
+                />
+              </g>
+            </Draggable>
+          );
+        })}
       </svg>
     </div>
   );
