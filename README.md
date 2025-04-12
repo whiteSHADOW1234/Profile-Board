@@ -89,11 +89,11 @@ The exported JSON is an array of objects, where each object represents an item o
   {
     "id": "unique-item-id-1",
     "url": "blob:http://localhost:5173/...", // Or potentially a data URL or original path
-    "type": "image", // Or "text", etc.
-    "x": 50,         // X coordinate (top-left corner)
-    "y": 50,         // Y coordinate (top-left corner)
-    "width": 100,    // Width of the item
-    "height": 100    // Height of the item
+    "type": "image", 
+    "x": 50,        
+    "y": 50,       
+    "width": 100,   
+    "height": 100   
   },
   // ... more items
 ]
