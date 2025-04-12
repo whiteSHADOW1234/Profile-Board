@@ -31,7 +31,7 @@ const SvgCanvas = ({ items, onUpdateItem }: SvgCanvasProps) => {
     });
   }, [items]);
 
-  const handleDrag = (e: any, data: any, item: SvgItem) => {
+  const handleDrag = (_: any, data: any, item: SvgItem) => {
     onUpdateItem({
       ...item,
       x: data.x,
