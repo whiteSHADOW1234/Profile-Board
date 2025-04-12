@@ -1,38 +1,41 @@
 // c:\Users\Huang\Desktop\OpenSourceStuff\profile-board\src\components\Sidebar.tsx
-import { UploadedAsset } from '../types'; // Updated import
+import { UploadedAsset } from '../types';
 import Uploader from './Uploader';
 import SvgPreviewList from './SvgPreviewList';
 import ExportButton from './ExportButton';
-// Removed DemoSvg import/usage as it wasn't in the request scope, add back if needed
+// import DemoSvg from './DemoSvg'; // Uncomment if using
 
 interface SidebarProps {
-  uploadedAssets: UploadedAsset[]; // Renamed prop
-  onAssetUpload: (asset: UploadedAsset) => void; // Renamed prop
-  onAddToCanvas: (asset: UploadedAsset) => void; // Updated type
+  uploadedAssets: UploadedAsset[];
+  onAssetUpload: (asset: UploadedAsset) => void;
+  onAddToCanvas: (asset: UploadedAsset) => void;
   onExport: () => void;
+  onDeleteAsset: (assetId: string) => void; // <-- Add prop type for delete handler
 }
 
 const Sidebar = ({
-  uploadedAssets, // Use renamed prop
-  onAssetUpload,  // Use renamed prop
+  uploadedAssets,
+  onAssetUpload,
   onAddToCanvas,
-  onExport
+  onExport,
+  onDeleteAsset // <-- Destructure the new prop
 }: SidebarProps) => {
   return (
-    <div className="w-full md:w-64 bg-gray-200 p-4 flex flex-col h-screen">
+    // Adjusted width from previous step
+    <div className="w-full md:w-80 bg-gray-200 p-4 flex flex-col h-screen">
 
-
+      {/* Uploader and Preview List */}
       <div className="flex-1 mt-6 overflow-y-auto">
         <SvgPreviewList
-          assets={uploadedAssets} // Pass renamed prop
+          assets={uploadedAssets}
           onAddToCanvas={onAddToCanvas}
+          onDeleteAsset={onDeleteAsset} // <-- Pass handler down
         />
       </div>
 
-      {/* Pass renamed prop */}
+      {/* Controls at the bottom */}
       <Uploader onAssetUpload={onAssetUpload} />
       <ExportButton onExport={onExport} />
-      {/* Add DemoSvg back here if needed, ensuring it creates an UploadedAsset */}
       {/* <DemoSvg onAddDemo={onAssetUpload} /> */}
     </div>
   );

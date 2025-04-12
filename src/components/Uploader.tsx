@@ -169,7 +169,7 @@ const Uploader = ({ onAssetUpload }: UploaderProps) => {
             type="url" // Use type="url" for better semantics/validation
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
-            placeholder="https://.../image.png or .../file.svg" // Updated placeholder
+            placeholder="https://.../image.png" // Updated placeholder
             className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-l text-sm"
             disabled={isLoading}
           />
