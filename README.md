@@ -15,7 +15,7 @@ Profile Board provides a flexible canvas where you can:
 *   **Delete** items you no longer need.
 *   **Export** the final layout (positions and dimensions of items) as JSON data to your clipboard.
 
-Once you have exported your layout as JSON, you can use this data with the `profileBoard` GitHub Action to automatically build a customized SVG representation of your board. This generated SVG is perfect for showcasing your design directly on your GitHub Profile!
+Once you have exported your layout as JSON, you can use this data with the [`profileBoard` GitHub Action](https://github.com/whiteSHADOW1234/profileBoard) to automatically build a customized SVG representation of your board. This generated SVG is perfect for showcasing your design directly on your GitHub Profile!
 
 ## 🚀 Features
 
