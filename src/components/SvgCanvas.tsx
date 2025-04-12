@@ -1,11 +1,11 @@
 // c:\Users\Huang\Desktop\OpenSourceStuff\profile-board\src\components\SvgCanvas.tsx
 import { useRef, createRef, useEffect } from 'react';
 import Draggable from 'react-draggable';
-import { SvgItem } from '../types';
+import { CanvasItem  } from '../types';
 
 interface SvgCanvasProps {
-  items: SvgItem[];
-  onUpdateItem: (item: SvgItem) => void;
+  items: CanvasItem [];
+  onUpdateItem: (item: CanvasItem ) => void;
   onDropItem: (originalSvgId: string, x: number, y: number) => void;
   onDeleteItem: (itemId: string) => void; // <-- Add prop type for delete handler
 }
@@ -52,7 +52,7 @@ const SvgCanvas = ({ items, onUpdateItem, onDropItem, onDeleteItem }: SvgCanvasP
     });
   }, [items]);
 
-  const handleDrag = (_: any, data: any, item: SvgItem) => {
+  const handleDrag = (_: any, data: any, item: CanvasItem ) => {
     onUpdateItem({
       ...item,
       x: data.x,
@@ -60,7 +60,7 @@ const SvgCanvas = ({ items, onUpdateItem, onDropItem, onDeleteItem }: SvgCanvasP
     });
   };
 
-  const handleResize = (e: React.MouseEvent, item: SvgItem, corner: string) => {
+  const handleResize = (e: React.MouseEvent, item: CanvasItem , corner: string) => {
     e.preventDefault();
     e.stopPropagation(); // Prevent drag start during resize
 
@@ -180,43 +180,49 @@ const SvgCanvas = ({ items, onUpdateItem, onDropItem, onDeleteItem }: SvgCanvasP
     e.dataTransfer.dropEffect = "copy";
   };
 
-  const renderSvgContent = (item: SvgItem) => {
-    if (!item.content) {
-      return <image href={item.url} width={item.width} height={item.height} />;
-    }
-    try {
-      const sanitizedContent = item.content.replace(/<script.*?<\/script>/gs, '');
-      // Attempt to parse and find the root SVG element to apply width/height directly
-      // This is a simplified approach; robust parsing might be needed for complex SVGs
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(sanitizedContent, "image/svg+xml");
-      const svgElement = doc.documentElement;
+  const renderCanvasItemContent = (item: CanvasItem) => { // <-- Renamed from renderSvgContent
+    // Use SVG <image> element for both SVGs and other image types via URL.
+    // It handles rendering external resources.
+    // If we have raw SVG content AND type is svg, we could embed, but <image> is simpler.
+    if (item.type === 'svg' && item.content) {
+        // Option 1: Embed SVG content directly (more complex parsing needed for reliable size)
+        try {
+            const sanitizedContent = item.content.replace(/<script.*?<\/script>/gs, '');
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(sanitizedContent, "image/svg+xml");
+            const svgElement = doc.documentElement;
 
-      if (svgElement && svgElement.nodeName === 'svg') {
-          svgElement.setAttribute('width', item.width.toString());
-          svgElement.setAttribute('height', item.height.toString());
-          // Preserve aspect ratio if viewBox is present
-          if (svgElement.getAttribute('viewBox')) {
-              svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-          }
-          const modifiedSvgString = new XMLSerializer().serializeToString(svgElement);
-          return <g dangerouslySetInnerHTML={{ __html: modifiedSvgString }} />;
-      } else {
-          // Fallback if parsing fails or it's not a standard SVG structure
-          console.warn("Could not parse SVG content for resizing, using transform scale.");
-          return (
-              <g
-                  dangerouslySetInnerHTML={{ __html: sanitizedContent }}
-                  transform={`scale(${item.width / 100}, ${item.height / 100})`} // Fallback scaling
-              />
-          );
-      }
-    } catch (error) {
-      console.error("Error rendering SVG content:", error);
-      return <rect width={item.width} height={item.height} fill="red" />;
+            if (svgElement && svgElement.nodeName === 'svg') {
+                svgElement.setAttribute('width', item.width.toString());
+                svgElement.setAttribute('height', item.height.toString());
+                if (svgElement.getAttribute('viewBox')) {
+                    svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                } else {
+                     svgElement.removeAttribute('preserveAspectRatio');
+                }
+                const modifiedSvgString = new XMLSerializer().serializeToString(svgElement);
+                // Wrap in a <g> to ensure transforms apply correctly if needed elsewhere
+                return <g dangerouslySetInnerHTML={{ __html: modifiedSvgString }} />;
+            } else {
+                 console.warn("Parsed content is not a valid SVG root element. Falling back to <image> tag.");
+                 // Fall through to Option 2
+            }
+        } catch (error) {
+            console.error("Error rendering embedded SVG content, falling back to <image>:", error);
+             // Fall through to Option 2
+        }
     }
+
+    // Option 2: Use <image> tag (Simpler, works for SVG URLs, external images, blob URLs)
+    return (
+      <image
+        href={item.url}
+        width={item.width}
+        height={item.height}
+        preserveAspectRatio="xMidYMid meet" // Control scaling
+      />
+    );
   };
-
 
   return (
     <div
@@ -230,12 +236,6 @@ const SvgCanvas = ({ items, onUpdateItem, onDropItem, onDeleteItem }: SvgCanvasP
         viewBox="0 0 800 600"
         preserveAspectRatio="xMidYMid meet"
       >
-        {/* <rect width="100%" height="100%" fill="url(#grid)" /> */}
-        <defs>
-            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(200,200,200,0.5)" strokeWidth="1"/>
-            </pattern>
-        </defs>
 
         {items.map((item) => {
           if (!nodeRefs.current.has(item.id)) {
@@ -249,74 +249,39 @@ const SvgCanvas = ({ items, onUpdateItem, onDropItem, onDeleteItem }: SvgCanvasP
               nodeRef={nodeRef}
               position={{ x: item.x, y: item.y }}
               onStop={(e, data) => handleDrag(e, data, item)}
-              handle=".draggable-handle"
-              cancel=".resize-handle, .delete-button" // Prevent dragging when clicking resize/delete handles
+              handle=".draggable-handle" // Still use the handle class
+              cancel=".resize-handle, .delete-button"
             >
+              {/* Main group for the draggable item */}
               <g ref={nodeRef} className="draggable-svg group">
-                 {/* Draggable Handle (covers the whole item) */}
-                 <rect
+
+                {/* 1. Render Item Content FIRST */}
+                {renderCanvasItemContent(item)} {/* Use updated render function */}
+
+                {/* 2. Render Controls (Resize handles, Delete Button, Border) SECOND */}
+                {/*    Their own event handlers prevent drag start */}
+                {/* Resize handles */}
+                <circle cx={item.width} cy={item.height} r={6} fill="#3b82f6" onMouseDown={(e) => handleResize(e, item, 'se')} className="resize-handle cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity"/>
+                <circle cx={0} cy={item.height} r={6} fill="#3b82f6" onMouseDown={(e) => handleResize(e, item, 'sw')} className="resize-handle cursor-sw-resize opacity-0 group-hover:opacity-100 transition-opacity"/>
+                <circle cx={item.width} cy={0} r={6} fill="#3b82f6" onMouseDown={(e) => handleResize(e, item, 'ne')} className="resize-handle cursor-ne-resize opacity-0 group-hover:opacity-100 transition-opacity"/>
+                <circle cx={0} cy={0} r={6} fill="#3b82f6" onMouseDown={(e) => handleResize(e, item, 'nw')} className="resize-handle cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity"/>
+                {/* Optional: Border */}
+                <rect x="-1" y="-1" width={item.width + 2} height={item.height + 2} fill="none" stroke="#3b82f6" strokeWidth="1" strokeDasharray="2 2" className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"/>
+                {/* Delete Button */}
+                <g className="delete-button cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" transform={`translate(${item.width - 8}, ${-8})`} onMouseDown={(e) => { e.stopPropagation(); onDeleteItem(item.id); }} onClick={(e) => e.stopPropagation()}>
+                    <circle cx="0" cy="0" r="10" fill="#ef4444" />
+                    <DeleteIcon />
+                </g>
+
+                {/* 3. Render Draggable Handle LAST (so it's on top) */}
+                <rect
                     className="draggable-handle cursor-move"
                     width={item.width}
                     height={item.height}
-                    fill="transparent"
-                 />
+                    fill="transparent" // Still transparent
+                    // No x/y needed as it's positioned relative to the <g> which is already transformed
+                />
 
-                {/* Render SVG Content */}
-                {renderSvgContent(item)}
-
-                {/* Resize handles - Show on hover */}
-                {/* SE */}
-                <circle
-                  cx={item.width} cy={item.height} r={6} fill="#3b82f6"
-                  onMouseDown={(e) => handleResize(e, item, 'se')}
-                  className="resize-handle cursor-se-resize opacity-0 group-hover:opacity-100 transition-opacity"
-                />
-                {/* SW */}
-                 <circle
-                  cx={0} cy={item.height} r={6} fill="#3b82f6"
-                  onMouseDown={(e) => handleResize(e, item, 'sw')}
-                  className="resize-handle cursor-sw-resize opacity-0 group-hover:opacity-100 transition-opacity"
-                />
-                {/* NE */}
-                 <circle
-                  cx={item.width} cy={0} r={6} fill="#3b82f6"
-                  onMouseDown={(e) => handleResize(e, item, 'ne')}
-                  className="resize-handle cursor-ne-resize opacity-0 group-hover:opacity-100 transition-opacity"
-                />
-                {/* NW */}
-                 <circle
-                  cx={0} cy={0} r={6} fill="#3b82f6"
-                  onMouseDown={(e) => handleResize(e, item, 'nw')}
-                  className="resize-handle cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity"
-                />
-                 {/* Optional: Border on hover */}
-                 <rect
-                    x="-1" y="-1"
-                    width={item.width + 2} height={item.height + 2}
-                    fill="none"
-                    stroke="#3b82f6"
-                    strokeWidth="1"
-                    strokeDasharray="2 2"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-                 />
-
-                 {/* *** NEW: Delete Button *** */}
-                 <g
-                    className="delete-button cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                    // Position the whole group (circle + icon) top-right, offset slightly
-                    transform={`translate(${item.width - 8}, ${-8})`}
-                    onMouseDown={(e) => {
-                        e.stopPropagation(); // Prevent drag start
-                        onDeleteItem(item.id);
-                    }}
-                    onClick={(e) => e.stopPropagation()} // Also stop click propagation
-                 >
-                    {/* Red background circle, centered at this <g>'s origin (0,0) */}
-                    <circle cx="0" cy="0" r="10" fill="#ef4444" /> {/* Red background, radius 10 */}
-                    {/* Icon is rendered relative to this <g>'s origin (0,0) */}
-                    {/* Its own x/y attributes handle the centering */}
-                    <DeleteIcon />
-                 </g>
               </g>
             </Draggable>
           );

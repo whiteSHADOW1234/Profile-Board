@@ -1,13 +1,25 @@
+// c:\Users\Huang\Desktop\OpenSourceStuff\profile-board\src\components\Uploader.tsx
 import { useState, useRef, DragEvent } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { UploadedSvg } from '../types';
+import { UploadedAsset } from '../types'; // Updated import
 import { isValidSvg } from '../utils/svgUtils';
 
 interface UploaderProps {
-  onSvgUpload: (svg: UploadedSvg) => void;
+  onAssetUpload: (asset: UploadedAsset) => void; // Renamed prop
 }
 
-const Uploader = ({ onSvgUpload }: UploaderProps) => {
+// Define accepted image MIME types
+const ACCEPTED_IMAGE_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml" // Keep SVG
+];
+const ACCEPTED_IMAGE_TYPES_STRING = ACCEPTED_IMAGE_TYPES.join(',');
+
+
+const Uploader = ({ onAssetUpload }: UploaderProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -22,33 +34,43 @@ const Uploader = ({ onSvgUpload }: UploaderProps) => {
     setIsDragging(false);
   };
 
-  const processSvgFile = async (file: File) => {
-    try {
-      setIsLoading(true);
-      
-      // Create an object URL first
-      const url = URL.createObjectURL(file);
-      
-      // Read file content
-      const content = await file.text();
-      
-      if (!isValidSvg(content)) {
-        URL.revokeObjectURL(url);
-        alert('Invalid SVG file.');
+  // Updated function to handle different file types
+  const processFile = async (file: File) => {
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        alert(`Unsupported file type: ${file.type}. Please upload JPG, PNG, GIF, WEBP, or SVG.`);
         return;
+    }
+
+    setIsLoading(true);
+    try {
+      const url = URL.createObjectURL(file);
+      let content: string | undefined = undefined;
+      let type: 'svg' | 'image' = 'image'; // Default to image
+
+      if (file.type === 'image/svg+xml') {
+        type = 'svg';
+        content = await file.text();
+        if (!isValidSvg(content)) {
+          URL.revokeObjectURL(url); // Clean up blob URL if invalid
+          alert('Invalid SVG file content.');
+          setIsLoading(false);
+          return;
+        }
       }
-      
-      // Create a new SVG object
-      const newSvg: UploadedSvg = {
+      // For other image types, we don't need/read content here
+
+      const newAsset: UploadedAsset = {
         id: uuidv4(),
         url,
-        content
+        type, // Set the determined type
+        content // Will be undefined for non-SVGs
       };
-      
-      onSvgUpload(newSvg);
+
+      onAssetUpload(newAsset);
+
     } catch (err) {
-      console.error('Error processing SVG file:', err);
-      alert('Error processing SVG file.');
+      console.error('Error processing file:', err);
+      alert('Error processing file.');
     } finally {
       setIsLoading(false);
     }
@@ -57,71 +79,60 @@ const Uploader = ({ onSvgUpload }: UploaderProps) => {
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
-      if (file.type === 'image/svg+xml') {
-        processSvgFile(file);
-      } else {
-        alert('Please drop an SVG file.');
-      }
+      processFile(file); // Use the unified processing function
     }
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      if (file.type === 'image/svg+xml') {
-        processSvgFile(file);
-      } else {
-        alert('Please select an SVG file.');
-      }
+      processFile(file); // Use the unified processing function
+       // Reset file input value to allow uploading the same file again
+       e.target.value = '';
     }
   };
 
+  // Updated URL handler
   const handleUrlUpload = async () => {
-    if (!urlInput.trim()) {
+    const trimmedUrl = urlInput.trim();
+    if (!trimmedUrl) {
       alert('Please enter a URL.');
       return;
     }
 
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      
-      // First check if URL is reachable
-      const response = await fetch(urlInput, { method: 'GET' });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
-      }
-      
-      const contentType = response.headers.get('content-type');
-      
-      // Check content type if available
-      if (contentType && !contentType.includes('image/svg+xml') && !contentType.includes('text/xml') && !contentType.includes('application/xml')) {
-        console.warn('Warning: Resource might not be an SVG based on Content-Type:', contentType);
-      }
-      
-      // Get content
-      const content = await response.text();
-      
-      if (!isValidSvg(content)) {
-        alert('The URL does not point to a valid SVG.');
-        return;
-      }
-      
-      // Create new SVG object
-      const newSvg: UploadedSvg = {
+      // We won't fetch content here to validate, as it might be a dynamic image
+      // or face CORS issues. We'll let the browser handle loading via the URL.
+
+      // Basic check: does it look like an SVG URL? (imperfect but simple)
+    //   const isLikelySvg = trimmedUrl.toLowerCase().endsWith('.svg') || trimmedUrl.includes('svg'); // Simple heuristic
+
+      // For URLs like the GitHub stats, we can't easily get content or reliable type.
+      // Assume 'image' unless it clearly ends with .svg. The <image> tag in SvgCanvas
+      // can render SVGs via URL anyway.
+      const type: 'svg' | 'image' = trimmedUrl.toLowerCase().endsWith('.svg') ? 'svg' : 'image';
+
+      // If it's type 'svg', we *could* try fetching content, but let's keep it simple
+      // and only store content for file uploads for now.
+
+      const newAsset: UploadedAsset = {
         id: uuidv4(),
-        url: urlInput,
-        content
+        url: trimmedUrl, // Use the direct URL
+        type: type,
+        content: undefined // We don't fetch content for URL uploads here
       };
-      
-      onSvgUpload(newSvg);
+
+      onAssetUpload(newAsset);
       setUrlInput('');
+
     } catch (err) {
-      console.error('Error fetching SVG from URL:', err);
-      alert(`Error fetching SVG: ${(err as Error).message}`);
+      // Catch potential errors if we were doing fetch, etc.
+      console.error('Error processing URL:', err);
+      alert(`Error processing URL: ${(err as Error).message}`);
     } finally {
       setIsLoading(false);
     }
@@ -129,7 +140,7 @@ const Uploader = ({ onSvgUpload }: UploaderProps) => {
 
   return (
     <div className="space-y-4">
-      <div 
+      <div
         className={`uploader-area p-4 rounded text-center cursor-pointer ${isDragging ? 'drag-active' : ''} ${isLoading ? 'opacity-50' : ''}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -139,26 +150,26 @@ const Uploader = ({ onSvgUpload }: UploaderProps) => {
         {isLoading ? (
           <p className="text-gray-500">Processing...</p>
         ) : (
-          <p className="text-gray-500">Drag & drop SVG here<br/>or click to browse</p>
+          <p className="text-gray-500">Drag & drop Image/SVG here<br/>or click to browse</p> // Updated text
         )}
         <input
           type="file"
           ref={fileInputRef}
           className="hidden"
-          accept="image/svg+xml"
+          accept={ACCEPTED_IMAGE_TYPES_STRING} // Use defined types
           onChange={handleFileInputChange}
           disabled={isLoading}
         />
       </div>
 
       <div className="space-y-2">
-        <p className="text-sm font-medium text-gray-600">Or enter SVG URL:</p>
+        <p className="text-sm font-medium text-gray-600">Or enter Image/SVG URL:</p> {/* Updated text */}
         <div className="flex">
           <input
-            type="text"
+            type="url" // Use type="url" for better semantics/validation
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
-            placeholder="https://../../file.svg"
+            placeholder="https://.../image.png or .../file.svg" // Updated placeholder
             className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-l text-sm"
             disabled={isLoading}
           />
@@ -167,7 +178,7 @@ const Uploader = ({ onSvgUpload }: UploaderProps) => {
             className={`px-3 py-2 bg-blue-500 text-white rounded-r font-medium text-sm ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
             disabled={isLoading}
           >
-            {isLoading ? 'Loading...' : 'Upload'}
+            {isLoading ? 'Loading...' : 'Add URL'} {/* Updated text */}
           </button>
         </div>
       </div>

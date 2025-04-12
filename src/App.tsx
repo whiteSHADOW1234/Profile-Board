@@ -1,64 +1,71 @@
 // c:\Users\Huang\Desktop\OpenSourceStuff\profile-board\src\App.tsx
 import { useState } from 'react';
-import { SvgItem, UploadedSvg } from './types';
+// Updated import names
+import { CanvasItem, UploadedAsset } from './types';
 import SvgCanvas from './components/SvgCanvas';
 import Sidebar from './components/Sidebar';
 import './index.css';
-// Import uuid if you prefer it over crypto.randomUUID
-// import { v4 as uuidv4 } from 'uuid';
+// import { v4 as uuidv4 } from 'uuid'; // Use crypto.randomUUID if available
 
 function App() {
-  const [uploadedSvgs, setUploadedSvgs] = useState<UploadedSvg[]>([]);
-  const [canvasItems, setCanvasItems] = useState<SvgItem[]>([]);
+  // Updated state names
+  const [uploadedAssets, setUploadedAssets] = useState<UploadedAsset[]>([]);
+  const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([]);
 
-  const handleSvgUpload = (svg: UploadedSvg) => {
-    setUploadedSvgs(prev => [...prev, svg]);
+  // Updated handler name and type
+  const handleAssetUpload = (asset: UploadedAsset) => {
+    setUploadedAssets(prev => [...prev, asset]);
   };
 
-  // Handler for adding via double-click or button
-  const handleAddToCanvas = (svg: UploadedSvg) => {
-    const originalSvg = uploadedSvgs.find(item => item.id === svg.id) || svg;
-    const newItem: SvgItem = {
+  // Updated handler name and type
+  const handleAddToCanvas = (asset: UploadedAsset) => {
+    // Find the original asset data if needed (though asset passed in should be complete)
+    const originalAsset = uploadedAssets.find(item => item.id === asset.id) || asset;
+    const newItem: CanvasItem = {
       id: crypto.randomUUID(),
-      url: originalSvg.url,
-      content: originalSvg.content,
-      x: 50, y: 50, width: 100, height: 100
+      url: originalAsset.url,
+      type: originalAsset.type, // <-- Copy type
+      content: originalAsset.content, // <-- Copy content (if any)
+      x: 50, y: 50, width: 100, height: 100 // Default size/position
     };
     setCanvasItems(prev => [...prev, newItem]);
   };
 
-  // Handler specifically for items dropped onto the canvas
-  const handleDropOnCanvas = (originalSvgId: string, x: number, y: number) => {
-    const originalSvg = uploadedSvgs.find(svg => svg.id === originalSvgId);
-    if (!originalSvg) {
-      console.error("Dropped SVG not found in uploaded list:", originalSvgId);
-      alert("Error: Could not find the original SVG data for the dropped item.");
+  // Updated handler name and type
+  const handleDropOnCanvas = (originalAssetId: string, x: number, y: number) => {
+    const originalAsset = uploadedAssets.find(asset => asset.id === originalAssetId);
+    if (!originalAsset) {
+      console.error("Dropped Asset not found in uploaded list:", originalAssetId);
+      alert("Error: Could not find the original asset data for the dropped item.");
       return;
     }
-    const newItem: SvgItem = {
+    const newItem: CanvasItem = {
       id: crypto.randomUUID(),
-      url: originalSvg.url,
-      content: originalSvg.content,
-      x: x, y: y, width: 100, height: 100
+      url: originalAsset.url,
+      type: originalAsset.type, // <-- Copy type
+      content: originalAsset.content, // <-- Copy content (if any)
+      x: x, y: y, width: 100, height: 100 // Use drop coords, default size
     };
     setCanvasItems(prev => [...prev, newItem]);
   };
 
-  // Simplified handler: only updates existing items
-  const handleUpdateCanvasItem = (updatedItem: SvgItem) => {
+  // Updated handler name and type
+  const handleUpdateCanvasItem = (updatedItem: CanvasItem) => {
     setCanvasItems(prev =>
       prev.map(item => (item.id === updatedItem.id ? updatedItem : item))
     );
   };
 
-  // *** NEW: Handler for deleting an item from the canvas ***
+  // Handler name is fine, type is just string ID
   const handleDeleteCanvasItem = (itemIdToDelete: string) => {
     setCanvasItems(prev => prev.filter(item => item.id !== itemIdToDelete));
   };
 
+  // Export logic remains the same for now (exports basic placement info)
   const handleExport = () => {
-    const exportData = canvasItems.map(({ id, url, x, y, width, height }) => ({
-      id, url, x, y, width, height
+    // Export type if needed for more robust reloading? For now, keep it simple.
+    const exportData = canvasItems.map(({ id, url, type, x, y, width, height }) => ({
+      id, url, type, x, y, width, height // Added type to export
     }));
     navigator.clipboard.writeText(JSON.stringify(exportData, null, 2))
       .then(() => alert('Layout copied to clipboard!'))
@@ -72,15 +79,16 @@ function App() {
     <div className="flex flex-col md:flex-row h-screen bg-gray-100">
       <div className="flex-1 p-4 flex items-center justify-center overflow-hidden">
         <SvgCanvas
-          items={canvasItems}
+          items={canvasItems} // Prop name kept as items for simplicity in SvgCanvas
           onUpdateItem={handleUpdateCanvasItem}
           onDropItem={handleDropOnCanvas}
-          onDeleteItem={handleDeleteCanvasItem} // <-- Pass the new handler
+          onDeleteItem={handleDeleteCanvasItem}
         />
       </div>
       <Sidebar
-        uploadedSvgs={uploadedSvgs}
-        onSvgUpload={handleSvgUpload}
+        // Pass updated state and handlers
+        uploadedAssets={uploadedAssets}
+        onAssetUpload={handleAssetUpload}
         onAddToCanvas={handleAddToCanvas}
         onExport={handleExport}
       />
